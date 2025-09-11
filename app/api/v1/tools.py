@@ -7,7 +7,7 @@ import os
 from app.util.util import extrair_valores_inputs_bs4 as extract_values
 
 
-JSON_FILE_PATH = os.path.join(os.path.dirname(__file__), '../../../db/modelos.json')
+JSON_FILE_PATH = os.path.join(os.path.dirname(__file__), '../../../db/')
 
 router = APIRouter()
 
@@ -23,14 +23,29 @@ class RequestVeiculo(BaseModel):
     estado: Optional[str] = None
     pontuacao: str
 
+class RequestCertidao(BaseModel):
+    tipo_certidao: Optional[str] = None
+    pontuacao: str
+
 @router.get("/modelos", status_code=200)
 def get_modelos() -> Dict[Any, Any]:
     try:
-        with open(JSON_FILE_PATH, 'r', encoding='utf-8') as file:
+        with open(JSON_FILE_PATH + 'modelos.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
         return data
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Modelos file not found")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Error decoding JSON file")
+    
+@router.get("/tipos_certidao", status_code=200)
+def get_tipos_certidao() -> Dict[Any, Any]:
+    try:
+        with open(JSON_FILE_PATH + 'tipos_certidao.json', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+        return data
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Tipos de certidão file not found")
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="Error decoding JSON file")
 
@@ -148,3 +163,25 @@ def create_veiculo(request: RequestVeiculo):
     
     return {"message": "VEICULO processed", "response": json}
 
+@router.post("/certidao", status_code=201)
+def create_certidao(request: RequestCertidao):
+    form_data = {
+        "acao": "gerador_certidao",
+        "pontuacao": request.pontuacao if request.pontuacao else "N",
+        "tipo_certidao": request.tipo_certidao if request.tipo_certidao else "",
+    }
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+    }
+    try:
+        response = httpx.post(
+            "https://www.4devs.com.br/ferramentas_online.php",
+            data=form_data,
+            headers=headers,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"message": "CERTIDAO processed", "response": response.text}
